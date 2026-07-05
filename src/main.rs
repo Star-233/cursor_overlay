@@ -858,10 +858,11 @@ fn main() -> Result<()> {
             }
 
             // Commit rendering frame
+            // Present(1, ...) means V-Sync is enabled. The SwapChain will automatically block and synchronize
+            // to the monitor's native refresh rate (e.g. 60Hz, 144Hz, 240Hz, 360Hz) with 0% CPU overhead,
+            // as the GPU driver suspends the rendering thread until the next vertical blank.
+            // Therefore, we do not need std::thread::sleep here. Removing it ensures perfect high refresh rate.
             swap_chain.Present(1, DXGI_PRESENT(0)).ok()?;
-
-            // Control frame rate: cap at ~120 FPS to reduce CPU utilization
-            std::thread::sleep(Duration::from_millis(8));
         }
     }
 }
