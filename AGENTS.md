@@ -115,3 +115,29 @@ cd /home/nullsky/Workspaces/learn/cursor_overlay
 .\target\x86_64-pc-windows-gnu\debug\cursor_overlay.exe
 ```
 按下 `Ctrl + C` 即可完美关闭退出。
+
+---
+
+## 5. GitHub Actions 自动构建与发布机制 (CI/CD)
+
+项目在 `.github/workflows/release.yml` 中配置了自动化 CI/CD 工作流，以便在发布新版本时自动编译并发布 Windows 原生 `.exe` 二进制文件。
+
+### 触发机制
+当向 GitHub 仓库推送以 `v` 开头的标签（例如 `v1.0.0`）时，工作流会自动触发。
+
+### 构建环境与流程
+1. **构建环境**：运行在微软官方的 `windows-latest` 容器中。这允许我们直接使用原生 Windows SDK 和链接器，避免了交叉编译的链接复杂性。
+2. **编译器目标**：使用 `x86_64-pc-windows-msvc` 目标。编译产物相比于 MinGW-w64 (`x86_64-pc-windows-gnu`) 更加原生，没有任何第三方运行时库依赖。
+3. **缓存优化**：利用 `Swatinem/rust-cache` 对 Cargo 依赖进行缓存，加快后续构建速度。
+4. **发布附件**：编译完成后，自动在 GitHub 上创建一个新的 Release，并将编译好的免安装绿色版 `cursor_overlay.exe` 上传为发布附件。
+
+### 使用方法
+在本地代码开发完成后，只需打上 Tag 并推送即可触发自动发布：
+```bash
+# 1. 在本地打上版本标签
+git tag v1.0.0
+
+# 2. 推送标签到 GitHub (确保开启代理)
+export http_proxy=http://127.0.0.1:7897 && export https_proxy=http://127.0.0.1:7897
+git push origin v1.0.0
+```
