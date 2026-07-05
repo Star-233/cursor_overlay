@@ -56,14 +56,7 @@ cargo build --release
 .\target\release\cursor_overlay.exe
 ```
 
----
 
-## 🛠️ 技术原理与开发记录
-
-项目在开发过程中克服了多个 DirectX 与 Windows 底层混色、常量缓冲区对齐、以及多屏虚拟坐标重映射等踩坑问题，详细记录见：
-👉 **[开发踩坑与架构总结 (AGENTS.md)](AGENTS.md)**
-
----
 
 ## 🤝 参与开发
 
