@@ -82,7 +82,15 @@
     *   使用虚拟屏幕宏 `SM_XVIRTUALSCREEN`, `SM_YVIRTUALSCREEN`, `SM_CXVIRTUALSCREEN`, `SM_CYVIRTUALSCREEN` 初始化窗口坐标和 SwapChain 尺寸，使窗口横跨铺满所有显示屏。
     *   在渲染主循环和鼠标 Hook 接收到鼠标坐标后，**减去虚拟屏幕的起点偏移（`screen_x` / `screen_y`）** 进行本地化重映射，确保坐标映射进整个虚拟屏幕视口内。
 
+### 坑 6：任务栏遮挡悬浮窗（无法覆盖任务栏置顶）
+*   **现象**：程序启动后，拖尾和点击波纹可以在其他软件窗口上层绘制，但一旦鼠标移动到任务栏区域，特效会被 Windows 任务栏盖住。
+*   **原因**：
+    Windows 桌面管理器的 Z-Order 是分层级的。任务栏（Shell_TrayWnd）以及开始菜单通常位于更高级别的系统级 Z-Band，而我们通过 `WS_EX_TOPMOST` 属性创建的悬浮窗由于设置了 `WS_EX_NOACTIVATE` 且从不被激活，在用户与任务栏交互时，会被 DWM 排序到任务栏的下方。
+*   **解决**：
+    在主渲染循环中增加一个轻量级的帧计数器，**每隔 120 帧（高刷屏下约 1 秒左右）**，调用一次 `SetWindowPos` 将窗口强制重设为 `HWND_TOPMOST`，并传入 `SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE` 标识。这样可以在不抢占用户焦点、不造成画面闪烁的前提下，保证悬浮窗持续处于绝对顶层（包括覆盖任务栏）。
+
 ---
+
 
 ## 4. WSL 交叉编译与运行指南
 

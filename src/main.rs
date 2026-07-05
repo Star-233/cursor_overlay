@@ -653,6 +653,7 @@ fn main() -> Result<()> {
         println!("Render loop started. Press Ctrl+C in WSL terminal to exit.");
 
         let mut msg = MSG::default();
+        let mut frame_count = 0u64;
         loop {
             // Process window messages (needed for hotkeys, resizing, DComp synchronization)
             while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
@@ -662,6 +663,13 @@ fn main() -> Result<()> {
                     stop_mouse_hook();
                     return Ok(());
                 }
+            }
+
+            // Periodically force the window to the top of the topmost Z-order band
+            // to keep it above the taskbar and other topmost windows.
+            frame_count += 1;
+            if frame_count % 120 == 0 {
+                let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             }
 
             // Get current screen resolution (virtual screen)
