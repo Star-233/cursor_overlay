@@ -105,7 +105,8 @@ unsafe fn cursor_to_rgba(h_cursor: HCURSOR) -> Option<(Vec<u32>, u32, u32, i32, 
         return None;
     }
 
-    let h_bmp = if !icon_info.hbmColor.is_invalid() {
+    let is_color = !icon_info.hbmColor.is_invalid();
+    let h_bmp = if is_color {
         icon_info.hbmColor
     } else {
         icon_info.hbmMask
@@ -123,7 +124,7 @@ unsafe fn cursor_to_rgba(h_cursor: HCURSOR) -> Option<(Vec<u32>, u32, u32, i32, 
     }
 
     let width = bmp.bmWidth as u32;
-    let height = if !icon_info.hbmColor.is_invalid() {
+    let height = if is_color {
         bmp.bmHeight as u32
     } else {
         (bmp.bmHeight / 2) as u32
@@ -144,7 +145,8 @@ unsafe fn cursor_to_rgba(h_cursor: HCURSOR) -> Option<(Vec<u32>, u32, u32, i32, 
 
     let mut pixels = vec![0u32; (width * height) as usize];
     
-    if !icon_info.hbmColor.is_invalid() {
+    if is_color {
+        // 1. Read color pixels
         let res = GetDIBits(
             hdc,
             icon_info.hbmColor,
@@ -152,24 +154,51 @@ unsafe fn cursor_to_rgba(h_cursor: HCURSOR) -> Option<(Vec<u32>, u32, u32, i32, 
             height,
             Some(pixels.as_mut_ptr() as *mut _),
             &mut bmi,
-            DIB_USAGE(0), // DIB_RGB_COLORS
+            DIB_USAGE(0),
         );
         if res == 0 {
             DeleteDC(hdc);
             return None;
         }
 
-        // Fix alpha channel: if all pixels have 0 alpha, make them opaque
-        let mut has_alpha = false;
-        for p in &pixels {
-            if (*p >> 24) != 0 {
-                has_alpha = true;
-                break;
+        // 2. Read mask pixels to clear transparent areas (standard color cursor might use mask for alpha)
+        let mut mask_pixels = vec![0u32; (width * height) as usize];
+        let res_mask = GetDIBits(
+            hdc,
+            icon_info.hbmMask,
+            0,
+            height,
+            Some(mask_pixels.as_mut_ptr() as *mut _),
+            &mut bmi,
+            DIB_USAGE(0),
+        );
+
+        if res_mask != 0 {
+            for i in 0..pixels.len() {
+                // If AND mask pixel is not black (white), it is transparent in the cursor
+                let is_transparent = (mask_pixels[i] & 0x00FFFFFF) != 0;
+                if is_transparent {
+                    pixels[i] = 0x00000000;
+                } else {
+                    // If the color pixel has 0 alpha, make it opaque
+                    if (pixels[i] >> 24) == 0 {
+                        pixels[i] |= 0xFF000000;
+                    }
+                }
             }
-        }
-        if !has_alpha {
-            for p in &mut pixels {
-                *p |= 0xFF000000;
+        } else {
+            // Fallback: if mask read fails, default to original behavior
+            let mut has_alpha = false;
+            for p in &pixels {
+                if (*p >> 24) != 0 {
+                    has_alpha = true;
+                    break;
+                }
+            }
+            if !has_alpha {
+                for p in &mut pixels {
+                    *p |= 0xFF000000;
+                }
             }
         }
     } else {
@@ -201,8 +230,8 @@ unsafe fn cursor_to_rgba(h_cursor: HCURSOR) -> Option<(Vec<u32>, u32, u32, i32, 
                 let and_pixel = mask_pixels[idx_and];
                 let xor_pixel = mask_pixels[idx_xor];
                 
-                let is_transparent = (and_pixel & 1) != 0;
-                let is_white = (xor_pixel & 1) != 0;
+                let is_transparent = (and_pixel & 0x00FFFFFF) != 0;
+                let is_white = (xor_pixel & 0x00FFFFFF) != 0;
                 
                 pixels[idx_and] = if is_transparent {
                     0x00000000
