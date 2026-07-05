@@ -756,7 +756,34 @@ fn main() -> Result<()> {
                 }
             }
 
-            // Update trail queue
+            // Update trail queue with linear interpolation to prevent dotted trails at high speeds
+            if !trail.is_empty() {
+                let (last_x, last_y) = {
+                    let last_pt = trail.back().unwrap();
+                    (last_pt.x, last_pt.y)
+                };
+                let dx = current_mouse_x - last_x;
+                let dy = current_mouse_y - last_y;
+                let dist = (dx * dx + dy * dy).sqrt();
+                
+                // Spacing of 3.0 pixels ensures circular particles (diameter 12.0) overlap smoothly
+                let spacing = 3.0;
+                if dist > spacing {
+                    let num_points = (dist / spacing).floor() as i32;
+                    let now = Instant::now();
+                    for k in 1..num_points {
+                        let t = k as f32 / num_points as f32;
+                        let interp_x = last_x + dx * t;
+                        let interp_y = last_y + dy * t;
+                        trail.push_back(TrailPoint {
+                            x: interp_x,
+                            y: interp_y,
+                            time: now,
+                        });
+                    }
+                }
+            }
+
             trail.push_back(TrailPoint {
                 x: current_mouse_x,
                 y: current_mouse_y,
@@ -874,7 +901,7 @@ fn main() -> Result<()> {
                     let trail_y = pt.y - size / 2.0;
 
                     // Colorful trail (changes color based on its index in queue)
-                    let hue = (idx as f32 / 30.0) * 6.28;
+                    let hue = (idx as f32 / trail.len() as f32) * 6.28;
                     let r = (hue.sin() * 0.5 + 0.5) * 1.0;
                     let g = ((hue + 2.09).sin() * 0.5 + 0.5) * 1.0;
                     let b = ((hue + 4.18).sin() * 0.5 + 0.5) * 1.0;
